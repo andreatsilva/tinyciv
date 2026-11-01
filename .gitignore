@@ -1,0 +1,13 @@
+node_modules/
+dist/
+.openai/
+LOCAL-RUN.md
+*.tar.gz
+.sites/
+.wrangler/
+data/
+tools/
+*.log
+*.zip
+.env*
+!.env.example

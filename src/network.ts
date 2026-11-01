@@ -1,0 +1,28 @@
+import {createRealm,CATALOG,indexOf,type Realm} from './settlement.ts';
+import type {Order} from './protocol.ts';
+export type Roster={name:string;city:number;online:boolean}[];
+export function serverURL(raw:string){const u=new URL(raw.trim());if(u.username||u.password||u.search||u.hash)throw Error('Use a server address without credentials, query, or fragment.');if(u.protocol==='https:')u.protocol='wss:';if(u.protocol==='http:')u.protocol='ws:';if(!['ws:','wss:'].includes(u.protocol))throw Error('Use a WebSocket or HTTPS server address.');if(u.protocol==='ws:'&&!['127.0.0.1','localhost','[::1]'].includes(u.hostname))throw Error('Internet servers must use a secure wss:// address.');u.pathname='/play';return u.toString();}
+export class Multiplayer {
+  ws:WebSocket|null=null;player=-1;seed='';endpoint='';name='';hostId='';status='offline';roster:Roster=[];game:Realm|null=null;sequence=0;mapping:number[]=[];retry=0;stopped=false;timer=0;
+  pending=new Map<number,{resolve:(error:string)=>void;timer:number}>();
+  constructor(public onState:(g:Realm,initial:boolean)=>void,public onStatus:(status:string,error?:string)=>void){}
+  key(){return `tiny-civ-login:${this.hostId||this.endpoint}:${this.seed}`;}
+  join(endpoint:string,seed:string,name:string){this.leave();this.endpoint=serverURL(endpoint);this.seed=seed;this.name=name;this.stopped=false;this.retry=0;this.game=null;this.connect();}
+  connect(){this.status='connecting';this.onStatus(this.status);const ws=this.ws=new WebSocket(this.endpoint);let error='',resumeToken='';let accepted=false;
+    const deadline=window.setTimeout(()=>ws.close(),12000);
+    ws.onmessage=e=>{if(this.ws!==ws)return;try{const m=JSON.parse(e.data);if(m.type==='hello'){this.hostId=m.hostId;let token='';try{token=JSON.parse(localStorage.getItem(this.key())||'{}')[this.name.toLowerCase()]||JSON.parse(localStorage.getItem(`tiny-civ-login:${this.endpoint}:${this.seed}`)||'{}')[this.name.toLowerCase()]||'';}catch{}resumeToken=token;ws.send(JSON.stringify({type:'join',protocol:1,seed:this.seed,name:this.name,token}));}
+      else if(m.type==='joined'){accepted=true;clearTimeout(deadline);this.player=m.player;this.status='online';this.retry=0;if(m.token||resumeToken)try{const tokens=JSON.parse(localStorage.getItem(this.key())||'{}');tokens[this.name.toLowerCase()]=m.token||resumeToken;localStorage.setItem(this.key(),JSON.stringify(tokens));}catch{this.onStatus('online','Browser storage is unavailable. Rejoining with this name may fail.');}this.onStatus('online');}
+      else if(m.type==='state'){const initial=!this.game;const g=this.game??createRealm(m.seed,16);this.mapping=[this.player,...m.cities.map((c:any)=>c.id).filter((i:number)=>i!==this.player)];const local=(id:number)=>this.mapping.indexOf(id);
+        g.time=m.time;g.cities=this.mapping.map((id,i)=>({...m.cities[id],id:i}));g.buildings=m.buildings.map((b:any)=>({...b,city:local(b.city)}));g.workers=m.workers.map((w:any)=>({...w,city:local(w.city)}));g.armies=m.armies.map((a:any)=>({...a,city:local(a.city),target:local(a.target)}));g.soldiers=m.soldiers.map((u:any)=>({...u,city:local(u.city),targetCity:u.targetCity<0?-1:local(u.targetCity)}));g.effects=m.effects.map((s:any)=>({...s,city:local(s.city)}));g.events=m.events;g.humanCities=m.humanCities.map(local);g.disabledCities=m.disabledCities.map(local);this.roster=m.roster.map((p:any)=>({...p,city:local(p.city)}));
+        for(const [i,ground,amount,traffic]of m.terrain)Object.assign(g.cells[i],{ground,amount,traffic});g.blocked.clear();for(const b of g.buildings)for(let y=b.y;y<b.y+CATALOG[b.kind].height;y++)for(let x=b.x;x<b.x+CATALOG[b.kind].width;x++)g.blocked.add(indexOf(x,y));this.game=g;this.onState(g,initial);
+      }else if(m.type==='result'){const p=this.pending.get(m.id);if(p){clearTimeout(p.timer);this.pending.delete(m.id);p.resolve(m.error||'');}}
+      else if(m.type==='error'){error=String(m.error);this.onStatus(this.status,error);}
+    }catch{error='Could not read the server response. Reload to update your game.';ws.close(1002);}};
+    ws.onerror=()=>{error='Cannot reach the host. Check that the PC and tunnel are running.';};
+    ws.onclose=e=>{clearTimeout(deadline);if(this.ws!==ws)return;for(const p of this.pending.values()){clearTimeout(p.timer);p.resolve('Connection interrupted. Check the world before repeating the order.');}this.pending.clear();if(this.stopped)return;
+      if(e.code===1008||e.code===4001||!accepted&&!this.game){this.status='offline';this.onStatus('offline',error||e.reason||'Could not join the world.');return;}
+      this.status='reconnecting';this.onStatus(this.status,error||'Connection lost. Reconnecting…');this.timer=window.setTimeout(()=>{this.game=null;this.connect();},Math.min(10000,1000*2**this.retry++));};
+  }
+  order(order:Order):Promise<string>{if(this.status!=='online'||this.ws?.readyState!==WebSocket.OPEN)return Promise.resolve('Waiting for the host. Your world is frozen until reconnected.');const id=++this.sequence;const o={...order};for(const key of ['target','targetCity'])if(typeof o[key]==='number'&&(o[key] as number)>=0)o[key]=this.mapping[o[key] as number];return new Promise(resolve=>{const timer=window.setTimeout(()=>{this.pending.delete(id);resolve('The host has not confirmed this order. Check the world before repeating it.');},7000);this.pending.set(id,{resolve,timer});this.ws!.send(JSON.stringify({type:'order',id,order:o}));});}
+  leave(){this.stopped=true;clearTimeout(this.timer);this.ws?.close();this.ws=null;this.status='offline';for(const p of this.pending.values()){clearTimeout(p.timer);p.resolve('Left the shared world.');}this.pending.clear();}
+}
