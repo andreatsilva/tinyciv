@@ -2,12 +2,13 @@
 
 ## v3 multiplayer and progression
 
-- Strict TypeScript checking and production build pass. All 28 automated tests pass.
+- Strict TypeScript checking and production build pass. All 29 automated tests pass, including automatic builder assignment and actual construction completion for a second human city.
 - Five real WebSocket clients join one room, receive shared state, and issue commands. A sixth is rejected. Another seed has separate state.
 - Cross-owner building commands are rejected. Player ownership comes from the session even when a command supplies a forged owner.
 - Reserved names require their reconnect key; reconnect restores a village. Host restart reloads the world, player slots, and troops from an atomic save.
 - Unit tests verify deployment, movement, return to reserve, actual unit damage and death, siege loot/recovery/protection, advanced recruitment unlocks, research time/cost, and validated military save continuation.
 - Two in-app browser clients joined the same PC host through the live public Cloudflare tunnel. Each received a distinct village; both deployed visible soldiers and the second client selected its own five soldiers after the host confirmed deployment.
+- Browser box-selection and a right-click formation move returned a confirmed movement order. The war room showed both players and the shared invitation fields.
 - The public tunnel health endpoint returned the game protocol successfully. The downloaded cloudflared executable has a valid Cloudflare Authenticode signature.
 - Source uses relative asset paths, and a compiled Pages client is packaged under docs/. GitHub Pages activation and hosted-client verification are recorded separately from local checks.
 - These checks do not establish five-human remote latency, long-duration internet uptime, a complete security/accessibility audit, or real-device/cross-browser coverage. Guest login has no account recovery. The temporary tunnel depends on the PC remaining online.

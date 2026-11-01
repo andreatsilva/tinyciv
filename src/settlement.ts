@@ -141,7 +141,7 @@ function tickWorker(g:Realm,w:Worker,dt:number){
   if(w.state==='building'){
     const b=g.buildings.find(b=>b.id===w.targetBuilding);if(!b||b.complete){w.state='idle';return;}
     b.progress=Math.min(1,b.progress+dt/CATALOG[b.kind].seconds);
-    if(b.progress>=1){b.complete=true;if(b.city===0)notice(g,`${CATALOG[b.kind].name} completed. Your village is growing.`,'build');w.state='idle';}
+    if(b.progress>=1){b.complete=true;if((g.humanCities||[0]).includes(b.city))notice(g,`${g.cities[b.city].name} completed ${CATALOG[b.kind].name}.`,'build');w.state='idle';}
     return;
   }
   const boostKind=w.job==='wood'?'lumber':w.job==='stone'?'quarry':w.job==='iron'?'mine':null;
@@ -170,7 +170,7 @@ export function placeBuilding(g:Realm,city:number,kind:BuildingKind,x:number,y:n
   const error=placementError(g,city,kind,x,y);if(error)return error;
   if(!canAfford(g.cities[city],CATALOG[kind].cost))return 'Not enough resources. Let your workers make a few deliveries.';
   pay(g.cities[city],CATALOG[kind].cost);const b:Building={id:g.nextId++,city,kind,x,y,level:1,progress:0,complete:false};g.buildings.push(b);markBuilding(g,b);
-  if(city===0){notice(g,`Construction started: ${CATALOG[kind].name}. Builders are on their way.`,'build');if(!workersOf(g,0).some(w=>w.job==='builder'))setJobCount(g,0,'builder',1);}
+  if((g.humanCities||[0]).includes(city)){notice(g,`${g.cities[city].name} started construction: ${CATALOG[kind].name}.`,'build');if(!workersOf(g,city).some(w=>w.job==='builder'))setJobCount(g,city,'builder',1);}
   return '';
 }
 export function upgradeCost(b:Building):Partial<Stock>{return {wood:Math.floor((CATALOG[b.kind].cost.wood||40)*b.level*1.4),stone:Math.floor((CATALOG[b.kind].cost.stone||20)*b.level*1.4),iron:Math.floor((CATALOG[b.kind].cost.iron||10)*b.level)};}
