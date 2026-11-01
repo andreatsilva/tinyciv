@@ -10,6 +10,8 @@
 - Two in-app browser clients joined the same PC host through the live public Cloudflare tunnel. Each received a distinct village; both deployed visible soldiers and the second client selected its own five soldiers after the host confirmed deployment.
 - Browser box-selection and a right-click formation move returned a confirmed movement order. The war room showed both players and the shared invitation fields.
 - The public tunnel health endpoint returned the game protocol successfully. The downloaded cloudflared executable has a valid Cloudflare Authenticode signature.
+- A separate public-tunnel probe joined five simultaneous WebSocket clients with the Pages origin, rejected a sixth, and confirmed the fifth player's deployment on the authoritative map. This verifies the internet tunnel path with automated clients, rather than five humans on separate networks.
+- GitHub CI passed all 29 tests and the production build on the uploaded release.
 - Source uses relative asset paths, and a compiled Pages client is packaged under docs/. GitHub Pages activation and hosted-client verification are recorded separately from local checks.
 - These checks do not establish five-human remote latency, long-duration internet uptime, a complete security/accessibility audit, or real-device/cross-browser coverage. Guest login has no account recovery. The temporary tunnel depends on the PC remaining online.
 
